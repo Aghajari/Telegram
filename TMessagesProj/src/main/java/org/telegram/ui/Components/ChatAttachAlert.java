@@ -182,6 +182,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             return MessagesController.getInstance(currentAccount).getChat(-dialogId);
         }
     }
+
     public void setCanOpenPreview(boolean canOpenPreview) {
         this.canOpenPreview = canOpenPreview;
         selectedArrowImageView.setVisibility(canOpenPreview && avatarPicker != 2 ? View.VISIBLE : View.GONE);
@@ -238,7 +239,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                         BotWebViewMenuContainer.ActionBarColorsAnimating actionBarColorsAnimating = new BotWebViewMenuContainer.ActionBarColorsAnimating();
                         actionBarColorsAnimating.setFrom(overrideBackgroundColor ? from : 0, resourcesProvider);
                         overrideBackgroundColor = isOverrideColor;
-                       // actionBarIsLight = ColorUtils.calculateLuminance(color) < 0.5f;
+                        // actionBarIsLight = ColorUtils.calculateLuminance(color) < 0.5f;
                         actionBarColorsAnimating.setTo(overrideBackgroundColor ? to : 0, resourcesProvider);
 
                         ValueAnimator animator = ValueAnimator.ofFloat(0, 1).setDuration(200);
@@ -2191,6 +2192,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 public boolean allowCaption() {
                     return false;
                 }
+
                 @Override
                 public void sendButtonPressed(int index, VideoEditedInfo videoEditedInfo, boolean notify, int scheduleDate, boolean forceDocument) {
                     sent = true;
@@ -2303,6 +2305,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             private final Paint backgroundPaint2 = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Path path = new Path();
             private final GradientClip clip = new GradientClip();
+
             @Override
             protected void dispatchDraw(@NonNull Canvas canvas) {
                 final float r = dp(20);
@@ -3026,7 +3029,8 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 AndroidUtilities.shakeView(topCaptionLimitView);
                 try {
                     writeButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
 
                 if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && MessagesController.getInstance(currentAccount).captionLengthLimitPremium > codepointCount) {
                     showCaptionLimitBulletin(parentFragment);
@@ -3092,7 +3096,8 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     AndroidUtilities.shakeView(topCaptionLimitView);
                     try {
                         writeButton.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && MessagesController.getInstance(currentAccount).captionLengthLimitPremium > codepointCount) {
                         showCaptionLimitBulletin(parentFragment);
                     }
@@ -3203,7 +3208,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                             msg.media.spoiler = photoEntry.hasSpoiler;
                             msg.message = photoEntry.caption == null ? "" : photoEntry.caption.toString();
                             if (TextUtils.isEmpty(msg.message) && i == 0 && a == 0) {
-                                CharSequence[] message = new CharSequence[]{ getCommentView().getText() };
+                                CharSequence[] message = new CharSequence[]{getCommentView().getText()};
                                 MessageObject.addLinks(true, message[0]);
                                 msg.entities = MediaDataController.getInstance(currentAccount).getEntities(message, true);
                                 msg.message = message[0].toString();
@@ -3244,7 +3249,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                         msg.out = true;
                         msg.from_id = MessagesController.getInstance(currentAccount).getPeer(UserConfig.getInstance(currentAccount).getClientUserId());
                         msg.peer_id = MessagesController.getInstance(currentAccount).getPeer(dialogId);
-                        CharSequence[] message = new CharSequence[]{ getCommentView().getText() };
+                        CharSequence[] message = new CharSequence[]{getCommentView().getText()};
                         MessageObject.addLinks(true, message[0]);
                         msg.entities = MediaDataController.getInstance(currentAccount).getEntities(message, true);
                         msg.message = message[0].toString();
@@ -3297,7 +3302,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                         msg.media.document.file_name = filename;
                         msg.media.document.size = new File(path).length();
                         if (TextUtils.isEmpty(msg.message) && i == 0) {
-                            CharSequence[] message = new CharSequence[]{ getCommentView().getText() };
+                            CharSequence[] message = new CharSequence[]{getCommentView().getText()};
                             msg.entities = MediaDataController.getInstance(currentAccount).getEntities(message, true);
                             msg.message = message[0].toString();
                         }
@@ -3317,7 +3322,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     messageObjects.addAll(audioLayout.getSelected());
                     if (!messageObjects.isEmpty()) {
                         MessageObject firstMessageObject = messageObjects.get(0);
-                        CharSequence[] message = new CharSequence[]{ getCommentView().getText() };
+                        CharSequence[] message = new CharSequence[]{getCommentView().getText()};
                         MessageObject.addLinks(true, message[0]);
                         firstMessageObject.messageOwner.entities = MediaDataController.getInstance(currentAccount).getEntities(message, true);
                         firstMessageObject.messageOwner.message = message[0].toString();
@@ -3349,10 +3354,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             ItemOptions options = ItemOptions.makeOptions(containerView, resourcesProvider, writeButton);
             if (messageWithCaption != null && (currentAttachLayout == photoLayout || currentAttachLayout == photoPreviewLayout)) {
                 MessagePreviewView.ToggleButton button = new MessagePreviewView.ToggleButton(
-                    context,
-                    R.raw.position_below, getString(R.string.CaptionAbove),
-                    R.raw.position_above, getString(R.string.CaptionBelow),
-                    resourcesProvider
+                        context,
+                        R.raw.position_below, getString(R.string.CaptionAbove),
+                        R.raw.position_above, getString(R.string.CaptionBelow),
+                        resourcesProvider
                 );
                 final MessageObject msg = messageWithCaption;
                 button.setState(!(msg.messageOwner.invert_media = captionAbove), false);
@@ -4841,7 +4846,6 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             return;
         }
         int count = currentAttachLayout.getSelectedItemsCount();
-
         if (count == 0) {
             writeButton.setCount(0, animated != 0);
             showCommentTextView(false, animated != 0);
@@ -5119,6 +5123,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
     private boolean allowDrawContent = true;
     public boolean sent = false;
+
     @Override
     public void setAllowDrawContent(boolean value) {
         super.setAllowDrawContent(value);
@@ -5565,27 +5570,27 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             }
             confirmationAlertShown = true;
             AlertDialog dialog =
-                new AlertDialog.Builder(baseFragment.getParentActivity(), resourcesProvider)
-                    .setTitle(getString(R.string.DiscardSelectionAlertTitle))
-                    .setMessage(getString(R.string.DiscardSelectionAlertMessage))
-                    .setPositiveButton(getString(R.string.Discard), (dialogInterface, i) -> {
-                        allowPassConfirmationAlert = true;
-                        dismiss();
-                    })
-                    .setNegativeButton(getString(R.string.Cancel), null)
-                    .setOnCancelListener(di -> {
-                        if (appearSpringAnimation != null) {
-                            appearSpringAnimation.cancel();
-                        }
-                        appearSpringAnimation = new SpringAnimation(super.containerView, DynamicAnimation.TRANSLATION_Y, 0);
-                        appearSpringAnimation.getSpring().setDampingRatio(1.5f);
-                        appearSpringAnimation.getSpring().setStiffness(1500.0f);
-                        appearSpringAnimation.start();
-                    })
-                    .setOnPreDismissListener(di -> {
-                        confirmationAlertShown = false;
-                    })
-                    .create();
+                    new AlertDialog.Builder(baseFragment.getParentActivity(), resourcesProvider)
+                            .setTitle(getString(R.string.DiscardSelectionAlertTitle))
+                            .setMessage(getString(R.string.DiscardSelectionAlertMessage))
+                            .setPositiveButton(getString(R.string.Discard), (dialogInterface, i) -> {
+                                allowPassConfirmationAlert = true;
+                                dismiss();
+                            })
+                            .setNegativeButton(getString(R.string.Cancel), null)
+                            .setOnCancelListener(di -> {
+                                if (appearSpringAnimation != null) {
+                                    appearSpringAnimation.cancel();
+                                }
+                                appearSpringAnimation = new SpringAnimation(super.containerView, DynamicAnimation.TRANSLATION_Y, 0);
+                                appearSpringAnimation.getSpring().setDampingRatio(1.5f);
+                                appearSpringAnimation.getSpring().setStiffness(1500.0f);
+                                appearSpringAnimation.start();
+                            })
+                            .setOnPreDismissListener(di -> {
+                                confirmationAlertShown = false;
+                            })
+                            .create();
             dialog.show();
             TextView button = (TextView) dialog.getButton(DialogInterface.BUTTON_POSITIVE);
             if (button != null) {
@@ -5662,6 +5667,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
     }
 
     public MentionsContainerView mentionContainer;
+
     private void createMentionsContainer() {
         mentionContainer = new MentionsContainerView(getContext(), UserConfig.getInstance(currentAccount).getClientUserId(), 0, LaunchActivity.getLastFragment(), null, resourcesProvider) {
             @Override
@@ -5683,6 +5689,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             public void replaceText(int start, int len, CharSequence replacingString, boolean allowShort) {
                 replaceWithText(start, len, replacingString, allowShort);
             }
+
             @Override
             public Paint.FontMetricsInt getFontMetrics() {
                 return commentTextView.getEditText().getPaint().getFontMetricsInt();
@@ -5713,6 +5720,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
     public void setCaptionAbove(boolean above) {
         setCaptionAbove(above, true);
     }
+
     public void setCaptionAbove(boolean above, boolean animated) {
         final EditTextEmoji fromView = getCommentView();
         captionAbove = above;
@@ -5724,45 +5732,45 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         if (animated) {
             topCommentContainer.setVisibility(allowCaption ? View.VISIBLE : View.GONE);
             topCommentContainer.animate()
-                .alpha(showAbove && allowCaption ? 1.0f : 0.0f)
-                .setDuration(320)
-                .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
-                .setUpdateListener(a -> {
-                    updatedTopCaptionHeight();
-                })
-                .withEndAction(() -> {
-                    if (!(showAbove && allowCaption)) {
-                        topCommentContainer.setVisibility(View.GONE);
-                    }
-                    updatedTopCaptionHeight();
-                })
-                .start();
+                    .alpha(showAbove && allowCaption ? 1.0f : 0.0f)
+                    .setDuration(320)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
+                    .setUpdateListener(a -> {
+                        updatedTopCaptionHeight();
+                    })
+                    .withEndAction(() -> {
+                        if (!(showAbove && allowCaption)) {
+                            topCommentContainer.setVisibility(View.GONE);
+                        }
+                        updatedTopCaptionHeight();
+                    })
+                    .start();
 
             captionContainer.setVisibility(View.VISIBLE);
             if (moveCaptionButton != null) {
                 moveCaptionButton.setVisibility(View.VISIBLE);
             }
             captionContainer.animate()
-                .translationY(!showAbove && allowCaption ? 0 : captionContainer.getMeasuredHeight())
-                .alpha(!showAbove && allowCaption ? 1.0f : 0.0f)
-                .setDuration(320)
-                .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
-                .setUpdateListener(a -> {
-                    if (moveCaptionButton != null) {
-                        moveCaptionButton.setTranslationY(bottomPannelTranslation - commentTextView.getHeight() + captionContainer.getTranslationY());
-                        moveCaptionButton.setAlpha(captionContainer.getAlpha());
-                    }
-                    frameLayout2.invalidate();
-                })
-                .withEndAction(() -> {
-                    if (showAbove || !allowCaption) {
-                        captionContainer.setVisibility(View.GONE);
+                    .translationY(!showAbove && allowCaption ? 0 : captionContainer.getMeasuredHeight())
+                    .alpha(!showAbove && allowCaption ? 1.0f : 0.0f)
+                    .setDuration(320)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
+                    .setUpdateListener(a -> {
                         if (moveCaptionButton != null) {
-                            moveCaptionButton.setVisibility(View.GONE);
+                            moveCaptionButton.setTranslationY(bottomPannelTranslation - commentTextView.getHeight() + captionContainer.getTranslationY());
+                            moveCaptionButton.setAlpha(captionContainer.getAlpha());
                         }
-                    }
-                })
-                .start();
+                        frameLayout2.invalidate();
+                    })
+                    .withEndAction(() -> {
+                        if (showAbove || !allowCaption) {
+                            captionContainer.setVisibility(View.GONE);
+                            if (moveCaptionButton != null) {
+                                moveCaptionButton.setVisibility(View.GONE);
+                            }
+                        }
+                    })
+                    .start();
         } else {
             topCommentContainer.setVisibility(showAbove && allowCaption ? View.VISIBLE : View.GONE);
             topCommentContainer.setAlpha(showAbove && allowCaption ? 1.0f : 0.0f);

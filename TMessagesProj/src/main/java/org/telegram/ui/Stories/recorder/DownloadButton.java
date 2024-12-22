@@ -108,6 +108,28 @@ public class DownloadButton extends ImageView {
         }
     }
 
+    public void save(OnDoneListener onDone) {
+        if (downloading || currentEntry == null) {
+            return;
+        }
+        downloading = true;
+        if (toast != null) {
+            toast.hide();
+            toast = null;
+        }
+        if (buildingVideo != null) {
+            buildingVideo.stop(true);
+            buildingVideo = null;
+        }
+        if (prepare != null) {
+            preparing = true;
+            prepare.run(() -> onClickInternal(onDone));
+        }
+        if (prepare == null) {
+            onClickInternal(onDone);
+        }
+    }
+
     private void onClick() {
         if (Build.VERSION.SDK_INT >= 23 && (Build.VERSION.SDK_INT <= 28 || BuildVars.NO_SCOPED_STORAGE) && getContext().checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             final Activity activity = AndroidUtilities.findActivity(getContext());
@@ -144,15 +166,15 @@ public class DownloadButton extends ImageView {
         }
         if (prepare != null) {
             preparing = true;
-            prepare.run(this::onClickInternal);
+            prepare.run(() -> onClickInternal(null));
         }
         updateImage();
         if (prepare == null) {
-            onClickInternal();
+            onClickInternal(null);
         }
     }
 
-    private void onClickInternal() {
+    private void onClickInternal(OnDoneListener onDone) {
         if (!preparing || currentEntry == null) {
             return;
         }
@@ -177,6 +199,10 @@ public class DownloadButton extends ImageView {
             final File file = AndroidUtilities.generateVideoPath();
             buildingVideo = new BuildingVideo(currentAccount, currentEntry, file, () -> {
                 if (!downloading || currentEntry == null) {
+                    return;
+                }
+                if (onDone != null) {
+                    AndroidUtilities.runOnUIThread(() -> onDone.onDone(file));
                     return;
                 }
                 MediaController.saveFile(file.getAbsolutePath(), getContext(), 1, null, null, uri -> {
@@ -216,6 +242,10 @@ public class DownloadButton extends ImageView {
                     return;
                 }
                 AndroidUtilities.runOnUIThread(() -> {
+                    if (onDone != null) {
+                        onDone.onDone(file);
+                        return;
+                    }
                     MediaController.saveFile(file.getAbsolutePath(), getContext(), 0, null, null, uri -> {
                         downloading = false;
                         updateImage();
@@ -232,7 +262,9 @@ public class DownloadButton extends ImageView {
                 });
             });
         }
-        updateImage();
+        if (onDone == null) {
+            updateImage();
+        }
     }
 
     private boolean wasImageDownloading = true;
@@ -355,7 +387,8 @@ public class DownloadButton extends ImageView {
                         if (file != null) {
                             file.delete();
                         }
-                    } catch (Exception ignore) {}
+                    } catch (Exception ignore) {
+                    }
                     onCancel.run();
                 }
             }
@@ -444,19 +477,19 @@ public class DownloadButton extends ImageView {
             final float prepareWidth = Math.max(preparingLayoutWidth, dp(54)) + dp(21 + 21);
             final float prepareHeight = dp(21 + 54 + 18 + 18) + preparingLayout.getHeight();
             prepareRect.set(
-                (getWidth() - prepareWidth) / 2f,
-                (getHeight() - prepareHeight) / 2f,
-                (getWidth() + prepareWidth) / 2f,
-                (getHeight() + prepareHeight) / 2f
+                    (getWidth() - prepareWidth) / 2f,
+                    (getHeight() - prepareHeight) / 2f,
+                    (getWidth() + prepareWidth) / 2f,
+                    (getHeight() + prepareHeight) / 2f
             );
 
             final float toastWidth = dp(9 + 36 + 7 + 22) + doneLayoutWidth;
             final float toastHeight = dp(6 + 36 + 6);
             toastRect.set(
-                (getWidth() - toastWidth) / 2f,
-                (getHeight() - toastHeight) / 2f,
-                (getWidth() + toastWidth) / 2f,
-                (getHeight() + toastHeight) / 2f
+                    (getWidth() - toastWidth) / 2f,
+                    (getHeight() - toastHeight) / 2f,
+                    (getWidth() + toastWidth) / 2f,
+                    (getHeight() + toastHeight) / 2f
             );
 
             AndroidUtilities.lerp(prepareRect, toastRect, t, currentRect);
@@ -513,8 +546,8 @@ public class DownloadButton extends ImageView {
 
             canvas.save();
             canvas.translate(
-                prepareRect.left + dp(21) - preparingLayoutLeft,
-                prepareRect.bottom - dp(18) - preparingLayout.getHeight()
+                    prepareRect.left + dp(21) - preparingLayoutLeft,
+                    prepareRect.bottom - dp(18) - preparingLayout.getHeight()
             );
             textPaint.setAlpha((int) (0xFF * alpha));
             preparingLayout.draw(canvas);
@@ -525,10 +558,10 @@ public class DownloadButton extends ImageView {
             if (lottieDrawable != null) {
                 lottieDrawable.setAlpha((int) (0xFF * alpha));
                 lottieDrawable.setBounds(
-                    (int) (toastRect.left + dp(9)),
-                    (int) (toastRect.top + dp(6)),
-                    (int) (toastRect.left + dp(9 + 36)),
-                    (int) (toastRect.top + dp(6 + 36))
+                        (int) (toastRect.left + dp(9)),
+                        (int) (toastRect.top + dp(6)),
+                        (int) (toastRect.left + dp(9 + 36)),
+                        (int) (toastRect.top + dp(6 + 36))
                 );
                 lottieDrawable.draw(canvas);
             }
@@ -570,6 +603,7 @@ public class DownloadButton extends ImageView {
         }
 
         private Runnable hideRunnable;
+
         public void hide() {
             if (hideRunnable != null) {
                 AndroidUtilities.cancelRunOnUIThread(hideRunnable);
@@ -585,6 +619,7 @@ public class DownloadButton extends ImageView {
         }
 
         private Runnable onCancel;
+
         public void setOnCancelListener(Runnable onCancel) {
             this.onCancel = onCancel;
         }
@@ -615,5 +650,9 @@ public class DownloadButton extends ImageView {
             }
             return super.onTouchEvent(event);
         }
+    }
+
+    public interface OnDoneListener {
+        void onDone(File file);
     }
 }

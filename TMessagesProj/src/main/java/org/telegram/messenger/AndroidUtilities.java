@@ -5690,16 +5690,19 @@ public class AndroidUtilities {
         if (onBitmapDone == null) {
             return;
         }
+        makeGlobalBlurBitmap(onBitmapDone, downscale, amount, forView, allGlobalViews(), exclude);
+    }
 
-        List<View> views = allGlobalViews();
-
-        if (views == null) {
+    public static void makeGlobalBlurBitmap(Utilities.Callback<Bitmap> onBitmapDone, float downscale, int amount, View forView, List<View> finalViews, List<View> exclude) {
+        if (onBitmapDone == null) {
+            return;
+        }
+        if (finalViews == null) {
             onBitmapDone.run(null);
             return;
         }
         makingGlobalBlurBitmap = true;
 
-        final List<View> finalViews = views;
         //Utilities.themeQueue.postRunnable(() -> {
         try {
             int w;
@@ -5746,12 +5749,12 @@ public class AndroidUtilities {
             }
             Utilities.stackBlurBitmap(bitmap, Math.max(amount, Math.max(w, h) / 180));
 //            AndroidUtilities.runOnUIThread(() -> {
-                onBitmapDone.run(bitmap);
+            onBitmapDone.run(bitmap);
 //            });
         } catch (Exception e) {
             FileLog.e(e);
 //            AndroidUtilities.runOnUIThread(() -> {
-                onBitmapDone.run(null);
+            onBitmapDone.run(null);
 //            });
         } finally {
             makingGlobalBlurBitmap = false;

@@ -6213,6 +6213,10 @@
     <string name="StorySoundNotMuted">Sound is now not muted.</string>
     <string name="StoryOriginalSoundMuted">Original audio will be removed.</string>
     <string name="StoryOriginalSoundNotMuted">Original audio will be preserved.</string>
+    <string name="AttachRecorderSoundMuted">Sound is now muted.</string>
+    <string name="AttachRecorderSoundNotMuted">Sound is now not muted.</string>
+    <string name="AttachRecorderOriginalSoundMuted">Original audio will be removed.</string>
+    <string name="AttachRecorderOriginalSoundNotMuted">Original audio will be preserved.</string>
     <string name="StoryDraftSaved">Draft saved</string>
     <string name="StoryUploading">Uploading story…</string>
     <string name="NotificationStory">%s shared a story with you</string>

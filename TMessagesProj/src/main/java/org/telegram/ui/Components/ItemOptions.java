@@ -62,6 +62,8 @@ import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stories.recorder.HintView2;
 import org.telegram.ui.Stories.recorder.ToggleButton;
 
+import java.util.List;
+
 public class ItemOptions {
 
     public static ItemOptions makeOptions(@NonNull BaseFragment fragment, @NonNull View scrimView) {
@@ -115,9 +117,11 @@ public class ItemOptions {
     private boolean drawScrim = true;
 
     private boolean blur;
+    private List<View> blurViews;
 
-    public ItemOptions setBlur(boolean b) {
+    public ItemOptions setBlur(boolean b, List<View> blurViews) {
         this.blur = b;
+        this.blurViews = blurViews;
         return this;
     }
 
@@ -1103,9 +1107,11 @@ public class ItemOptions {
 
             if (blur) {
                 blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-                AndroidUtilities.makeGlobalBlurBitmap(b -> {
-                    blurBitmap = b;
-                }, 12.0f);
+                if (blurViews != null) {
+                    AndroidUtilities.makeGlobalBlurBitmap(b -> blurBitmap = b, 12.0f, 12, null, blurViews, null);
+                } else {
+                    AndroidUtilities.makeGlobalBlurBitmap(b -> blurBitmap = b, 12.0f);
+                }
             }
         }
 

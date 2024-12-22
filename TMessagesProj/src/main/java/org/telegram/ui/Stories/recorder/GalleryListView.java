@@ -1,7 +1,9 @@
 package org.telegram.ui.Stories.recorder;
 
+import static org.telegram.messenger.AndroidUtilities.bold;
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
+import static org.telegram.messenger.AndroidUtilities.rectTmp;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -34,14 +36,17 @@ import android.util.Pair;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.SoundEffectConstants;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearSmoothScrollerCustom;
@@ -68,6 +73,7 @@ import org.telegram.ui.ActionBar.AdjustPanLayoutHelper;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.BackupImageView;
+import org.telegram.ui.Components.CheckBoxBase;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.FlickerLoadingView;
@@ -108,11 +114,21 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
     public boolean ignoreScroll;
     public final boolean onlyPhotos;
 
-    public GalleryListView(int currentAccount, Context context, Theme.ResourcesProvider resourcesProvider, MediaController.AlbumEntry startAlbum, boolean onlyPhotos) {
+    GalleryListSelector galleryListSelector;
+    private final float galleryAspectRatio;
+
+
+    public GalleryListView(int currentAccount, Context context, Theme.ResourcesProvider resourcesProvider, MediaController.AlbumEntry startAlbum, boolean onlyPhotos, GalleryListSelector galleryListSelector) {
         super(context);
+        this.galleryListSelector = galleryListSelector;
+        galleryAspectRatio = galleryListSelector == null ? ASPECT_RATIO : 1f;
         this.currentAccount = currentAccount;
         this.resourcesProvider = resourcesProvider;
-        this.onlyPhotos = onlyPhotos;
+        if (galleryListSelector != null && galleryListSelector.onlyPhoto()) {
+            this.onlyPhotos = true;
+        } else {
+            this.onlyPhotos = onlyPhotos;
+        }
 
         backgroundPaint.setColor(0xff1f1f1f);
         backgroundPaint.setShadowLayer(dp(2.33f), 0, dp(-.4f), 0x08000000);
@@ -165,6 +181,11 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         listView.setClipToPadding(false);
         addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         listView.setOnItemClickListener((view, position) -> {
+            if (view instanceof Cell && galleryListSelector != null && galleryListSelector.canSelect() &&
+                    ((Cell) view).currentObject instanceof MediaController.PhotoEntry) {
+                ((Cell) view).switchChecked();
+                return;
+            }
             if (position < 2 || onSelectListener == null || !(view instanceof Cell)) {
                 return;
             }
@@ -190,6 +211,15 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
                 onSelectListener.run(entry, entry.isVideo ? prepareBlurredThumb(cell) : null);
             }
         });
+        if (galleryListSelector != null) {
+            listView.setOnItemLongClickListener((view, position) -> {
+                if (view instanceof Cell) {
+                    ((Cell) view).switchChecked();
+                    return true;
+                }
+                return false;
+            });
+        }
         listView.setOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -557,16 +587,24 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
     }
 
     public boolean firstLayout = true;
-    protected void firstLayout() {}
-    protected void onScroll() {}
-    protected void onFullScreen(boolean isFullscreen) {}
+
+    protected void firstLayout() {
+    }
+
+    protected void onScroll() {
+    }
+
+    protected void onFullScreen(boolean isFullscreen) {
+    }
 
     private Runnable onBackClickListener;
+
     public void setOnBackClickListener(Runnable onBackClickListener) {
         this.onBackClickListener = onBackClickListener;
     }
 
     private Utilities.Callback2<Object, Bitmap> onSelectListener;
+
     public void setOnSelectListener(Utilities.Callback2<Object, Bitmap> onSelectListener) {
         this.onSelectListener = onSelectListener;
     }
@@ -660,6 +698,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         private Bitmap bitmap;
         private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint bgCheckboxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private LinearGradient gradient;
         private final Matrix bitmapMatrix = new Matrix();
@@ -677,10 +716,21 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         private StaticLayout draftLayout;
         private float draftLayoutWidth, draftLayoutLeft;
 
-        public Cell(Context context) {
+        private CheckBoxBase checkBoxBase;
+        private GalleryListSelector galleryListSelector;
+        private Runnable onSelectionChanged;
+        private final static Rect checkBoxHitRect = new Rect();
+        private boolean pressed;
+        private ValueAnimator animator;
+
+        private final float galleryAspectRatio;
+
+
+        public Cell(Context context, GalleryListSelector galleryListSelector, Runnable onSelectionChanged) {
             super(context);
 
             bgPaint.setColor(0x10ffffff);
+            bgCheckboxPaint.setColor(0xff1f1f1f);
 
             durationBackgroundPaint.setColor(0x4c000000);
             durationTextPaint.setTypeface(AndroidUtilities.bold());
@@ -689,11 +739,25 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
             draftTextPaint.setTextSize(AndroidUtilities.dp(11.33f));
             draftTextPaint.setColor(0xffffffff);
             durationPlayDrawable = context.getResources().getDrawable(R.drawable.play_mini_video).mutate();
+
+            if (galleryListSelector != null) {
+                this.onSelectionChanged = onSelectionChanged;
+                this.galleryListSelector = galleryListSelector;
+                checkBoxBase = new CheckBoxBase(this, 24, galleryListSelector.getResourceProvider());
+                checkBoxBase.setBackgroundType(7);
+                checkBoxBase.setColor(Theme.key_chat_attachCheckBoxBackground, Theme.key_chat_attachPhotoBackground, Theme.key_chat_attachCheckBoxCheck);
+                galleryAspectRatio = 1f;
+            } else {
+                galleryAspectRatio = ASPECT_RATIO;
+            }
         }
 
         @Override
         protected void onAttachedToWindow() {
             super.onAttachedToWindow();
+            if (checkBoxBase != null) {
+                checkBoxBase.onAttachedToWindow();
+            }
             AndroidUtilities.cancelRunOnUIThread(unload);
             if (currentObject != null) {
                 loadBitmap(currentObject);
@@ -703,6 +767,9 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         @Override
         protected void onDetachedFromWindow() {
             super.onDetachedFromWindow();
+            if (checkBoxBase != null) {
+                checkBoxBase.onDetachedFromWindow();
+            }
             AndroidUtilities.runOnUIThread(unload, 250);
         }
 
@@ -726,7 +793,20 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
             setDuration(photoEntry != null && photoEntry.isVideo ? AndroidUtilities.formatShortDuration(photoEntry.duration) : null);
             setDraft(false);
             loadBitmap(photoEntry);
+            loadSelection();
             invalidate();
+        }
+
+        public void loadSelection() {
+            if (currentObject instanceof MediaController.PhotoEntry) {
+                if (checkBoxBase != null) {
+                    Pair<Boolean, Integer> i = galleryListSelector.getSelectionState((MediaController.PhotoEntry) currentObject);
+                    if (i != null) {
+                        checkBoxBase.setChecked(i.second, i.first, false);
+                        scale = i.first ? 0.787f : 1.0f;
+                    }
+                }
+            }
         }
 
         private DispatchQueue myQueue;
@@ -823,7 +903,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
             }
 
             int rw = (int) Math.min(AndroidUtilities.displaySize.x / 3f, dp(330));
-            int rh = (int) (rw * ASPECT_RATIO);
+            int rh = (int) (rw * galleryAspectRatio);
 
             int[] colors = null;
             Bitmap bitmap = null;
@@ -840,14 +920,14 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
                 opts.inJustDecodeBounds = false;
                 bitmap = readBitmap(photoEntry, opts);
 
-                final boolean needGradient = bitmap != null && ((float) bitmap.getHeight() / bitmap.getWidth()) < ASPECT_RATIO;
+                final boolean needGradient = bitmap != null && ((float) bitmap.getHeight() / bitmap.getWidth()) < galleryAspectRatio;
                 if (needGradient) {
                     if (photoEntry.gradientTopColor == 0 && photoEntry.gradientBottomColor == 0 && bitmap != null && !bitmap.isRecycled()) {
                         colors = DominantColors.getColorsSync(true, bitmap, true);
                         photoEntry.gradientTopColor = colors[0];
                         photoEntry.gradientBottomColor = colors[1];
                     } else if (photoEntry.gradientTopColor != 0 && photoEntry.gradientBottomColor != 0) {
-                        colors = new int[] {photoEntry.gradientTopColor, photoEntry.gradientBottomColor};
+                        colors = new int[]{photoEntry.gradientTopColor, photoEntry.gradientBottomColor};
                     }
                 }
             } else if (entry instanceof StoryEntry) {
@@ -902,7 +982,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
             if (entry instanceof MediaController.PhotoEntry) {
                 MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) entry;
                 if (photoEntry.gradientTopColor != 0 && photoEntry.gradientBottomColor != 0) {
-                    gradientPaint.setShader(gradient = new LinearGradient(0, 0, 0, 1, new int[] { photoEntry.gradientTopColor, photoEntry.gradientBottomColor }, new float[] { 0, 1 }, Shader.TileMode.CLAMP));
+                    gradientPaint.setShader(gradient = new LinearGradient(0, 0, 0, 1, new int[]{photoEntry.gradientTopColor, photoEntry.gradientBottomColor}, new float[]{0, 1}, Shader.TileMode.CLAMP));
                     updateMatrix();
                 }
             }
@@ -943,7 +1023,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         private void updateMatrix() {
             if (getMeasuredWidth() > 0 && getMeasuredHeight() > 0 && bitmap != null) {
                 float s;
-                if ((float) bitmap.getHeight() / bitmap.getWidth() > ASPECT_RATIO - .1f) {
+                if ((float) bitmap.getHeight() / bitmap.getWidth() > galleryAspectRatio - .1f) {
                     s = Math.max(getMeasuredWidth() / (float) bitmap.getWidth(), getMeasuredHeight() / (float) bitmap.getHeight());
                 } else {
                     s = getMeasuredWidth() / (float) bitmap.getWidth();
@@ -1018,10 +1098,22 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         private final Path clipPath = new Path();
         private final float[] radii = new float[8];
 
+        private float scale = 1f;
+
         @Override
         public void draw(Canvas canvas) {
-
+            super.draw(canvas);
+            boolean scaled = scale != 1f;
             boolean restore = false;
+            if (scaled) {
+                canvas.save();
+                int left = (int) ((1f - scale) * getMeasuredWidth() / 2f);
+                int top = (int) ((1f - scale) * getMeasuredHeight() / 2f);
+                rectTmp.set(left, top, scale * getMeasuredWidth() + left, scale * getMeasuredHeight() + top);
+                canvas.clipRect(rectTmp);
+                canvas.scale(scale, scale, getMeasuredWidth() / 2f, getMeasuredHeight() / 2f);
+            }
+
             if (topLeft || topRight) {
                 canvas.save();
                 clipPath.rewind();
@@ -1032,8 +1124,6 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
                 canvas.clipPath(clipPath);
                 restore = true;
             }
-
-            super.draw(canvas);
 
             canvas.drawRect(0, 0, getWidth(), getHeight(), bgPaint);
             if (gradient != null) {
@@ -1060,10 +1150,10 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
 
                 if (drawDurationPlay) {
                     durationPlayDrawable.setBounds(
-                        (int) (AndroidUtilities.rectTmp.left + dp(6)),
-                        (int) (AndroidUtilities.rectTmp.centerY() - dp(8) / 2),
-                        (int) (AndroidUtilities.rectTmp.left + dp(13)),
-                        (int) (AndroidUtilities.rectTmp.centerY() + dp(8) / 2)
+                            (int) (AndroidUtilities.rectTmp.left + dp(6)),
+                            (int) (AndroidUtilities.rectTmp.centerY() - dp(8) / 2),
+                            (int) (AndroidUtilities.rectTmp.left + dp(13)),
+                            (int) (AndroidUtilities.rectTmp.centerY() + dp(8) / 2)
                     );
                     durationPlayDrawable.draw(canvas);
                 }
@@ -1076,6 +1166,122 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
 
             if (restore) {
                 canvas.restore();
+            }
+            if (scaled) {
+                canvas.restore();
+            }
+
+            if (checkBoxBase != null && currentObject instanceof MediaController.PhotoEntry && galleryListSelector != null && galleryListSelector.canSelect()) {
+                int size = AndroidUtilities.dp(26);
+                int padding = AndroidUtilities.dp(8);
+                float r = (size / 2f + 2) * ((1f - scale) / (1f - 0.787f));
+                canvas.drawCircle(getMeasuredWidth() - size / 2f - padding, padding + size / 2f, r, bgCheckboxPaint);
+                canvas.save();
+                canvas.translate(getMeasuredWidth() - size - padding, padding);
+                checkBoxBase.setBounds(0, 0, size, size);
+                checkBoxBase.draw(canvas);
+                canvas.restore();
+            }
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (checkBoxBase == null || !(currentObject instanceof MediaController.PhotoEntry) || galleryListSelector == null || !galleryListSelector.canSelect()) {
+                return super.onTouchEvent(event);
+            }
+            boolean result = false;
+            int hitSize = AndroidUtilities.dp(56);
+            checkBoxHitRect.set(getMeasuredWidth() - hitSize, 0, getMeasuredWidth(), hitSize);
+
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                if (checkBoxHitRect.contains((int) event.getX(), (int) event.getY())) {
+                    pressed = true;
+                    invalidate();
+                    result = true;
+                }
+            } else if (pressed) {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    pressed = false;
+                    switchChecked();
+                    playSoundEffect(SoundEffectConstants.CLICK);
+                    sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_CLICKED);
+                } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                    pressed = false;
+                    invalidate();
+                } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+                    if (!(checkBoxHitRect.contains((int) event.getX(), (int) event.getY()))) {
+                        pressed = false;
+                        invalidate();
+                    }
+                }
+            }
+            if (!result) {
+                result = super.onTouchEvent(event);
+            }
+
+            return result;
+        }
+
+        private void reorderSelection() {
+            if (getParent() == null) return;
+            ViewGroup parent = (ViewGroup) getParent();
+            for (int i = 0; i < parent.getChildCount(); i++) {
+                View c = parent.getChildAt(i);
+                if (c instanceof Cell && c != this) {
+                    ((Cell) c).loadSelection();
+                }
+            }
+        }
+
+        public void switchChecked() {
+            if (!(currentObject instanceof MediaController.PhotoEntry) || checkBoxBase == null) {
+                return;
+            }
+            Pair<Boolean, Integer> selectionInfo = galleryListSelector.onSelected((MediaController.PhotoEntry) currentObject);
+            if (selectionInfo == null) {
+                return;
+            }
+            checkBoxBase.setChecked(selectionInfo.second, selectionInfo.first, true);
+            if (!selectionInfo.first) reorderSelection();
+            if (onSelectionChanged != null) onSelectionChanged.run();
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+            animator = ValueAnimator.ofFloat(scale, selectionInfo.first ? 0.787f : 1.0f);
+            animator.setDuration(200);
+            animator.addUpdateListener((a) -> {
+                scale = (float) a.getAnimatedValue();
+                invalidate();
+            });
+            animator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (animator != null && animator.equals(animation)) {
+                        animator = null;
+                    }
+                }
+
+                @Override
+                public void onAnimationCancel(Animator animation) {
+                    if (animator != null && animator.equals(animation)) {
+                        animator = null;
+                    }
+                }
+            });
+            animator.start();
+        }
+
+        @Override
+        public void clearAnimation() {
+            super.clearAnimation();
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+
+                scale = checkBoxBase.isChecked() ? 0.787f : 1.0f;
+                invalidate();
             }
         }
 
@@ -1103,7 +1309,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             final int w = MeasureSpec.getSize(widthMeasureSpec);
-            setMeasuredDimension(w, (int) (w * ASPECT_RATIO));
+            setMeasuredDimension(w, (int) (w * galleryAspectRatio));
             updateMatrix();
         }
     }
@@ -1135,7 +1341,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
                 final int rowsCount = (int) Math.ceil(photosCount / (float) layoutManager.getSpanCount());
                 final int fullHeight = AndroidUtilities.displaySize.y - AndroidUtilities.dp(62);
                 final int itemWidth = (int) (width / (float) layoutManager.getSpanCount());
-                final int itemHeight = (int) (itemWidth * ASPECT_RATIO);
+                final int itemHeight = (int) (itemWidth * galleryAspectRatio);
                 final int height = Math.max(0, fullHeight - itemHeight * rowsCount);
                 setMeasuredDimension(width, height);
             } else {
@@ -1166,7 +1372,6 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             textView.setTextColor(0xFFFFFFFF);
             textView.setTypeface(AndroidUtilities.bold());
-            textView.setText(LocaleController.getString(onlyPhotos ? R.string.AddImage : R.string.ChoosePhotoOrVideo));
             addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 0, onlyPhotos ? 32 : 0, 0));
         }
     }
@@ -1188,8 +1393,15 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
                 view = new EmptyView(getContext());
             } else if (viewType == VIEW_TYPE_HEADER) {
                 view = headerView = new HeaderView(getContext(), onlyPhotos);
+                String text = galleryListSelector == null ? null : galleryListSelector.getTitle();
+                headerView.textView.setText(text == null ? LocaleController.getString(onlyPhotos ? R.string.AddImage : R.string.ChoosePhotoOrVideo) : text);
             } else {
-                view = new Cell(getContext());
+                view = new Cell(getContext(), galleryListSelector, () -> {
+                    if (headerView != null && galleryListSelector != null) {
+                        String text = galleryListSelector.getTitle();
+                        headerView.textView.setText(text == null ? LocaleController.getString(onlyPhotos ? R.string.AddImage : R.string.ChoosePhotoOrVideo) : text);
+                    }
+                });
             }
             return new RecyclerListView.Holder(view);
         }
@@ -1284,7 +1496,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         public void getPositionForScrollProgress(RecyclerListView listView, float progress, int[] position) {
             final int itemsCount = getTotalItemsCount();
             final int itemWidth = (int) ((listView.getWidth() - listView.getPaddingLeft() - listView.getPaddingRight()) / (float) layoutManager.getSpanCount());
-            final int itemHeight = (int) (itemWidth * ASPECT_RATIO);
+            final int itemHeight = (int) (itemWidth * galleryAspectRatio);
             final int rowsCount = (int) Math.ceil(itemsCount / (float) layoutManager.getSpanCount());
             final int totalItemsHeight = rowsCount * itemHeight;
             final int viewHeight = AndroidUtilities.displaySize.y - listView.getPaddingTop() - listView.getPaddingBottom();
@@ -1302,7 +1514,7 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         public float getScrollProgress(RecyclerListView listView) {
             final int itemsCount = getTotalItemsCount();
             final int itemWidth = (int) ((listView.getWidth() - listView.getPaddingLeft() - listView.getPaddingRight()) / (float) layoutManager.getSpanCount());
-            final int itemHeight = (int) (itemWidth * ASPECT_RATIO);
+            final int itemHeight = (int) (itemWidth * galleryAspectRatio);
             final int rowsCount = (int) Math.ceil(itemsCount / (float) layoutManager.getSpanCount());
             final int totalItemsHeight = rowsCount * itemHeight;
             final int viewHeight = AndroidUtilities.displaySize.y - listView.getPaddingTop();
@@ -1563,5 +1775,19 @@ public class GalleryListView extends FrameLayout implements NotificationCenter.N
         protected void onLoadingUpdate(boolean loading) {
 
         }
+    }
+
+    public interface GalleryListSelector {
+        Pair<Boolean, Integer> getSelectionState(MediaController.PhotoEntry entry);
+
+        Pair<Boolean, Integer> onSelected(MediaController.PhotoEntry entry);
+
+        Theme.ResourcesProvider getResourceProvider();
+
+        String getTitle();
+
+        boolean canSelect();
+
+        boolean onlyPhoto();
     }
 }

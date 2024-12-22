@@ -24,6 +24,7 @@ import org.telegram.ui.Components.CubicBezierInterpolator;
 
 public class PhotoVideoSwitcherView extends View implements FlashViews.Invertable {
 
+    private int selectorColor;
     private TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private Paint selectorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -39,10 +40,11 @@ public class PhotoVideoSwitcherView extends View implements FlashViews.Invertabl
     private boolean mIsScrolling, mIsTouch;
     private ValueAnimator animator;
 
-    public PhotoVideoSwitcherView(Context context) {
+    public PhotoVideoSwitcherView(Context context, boolean isLight) {
         super(context);
 
-        selectorPaint.setColor(0x32ffffff);
+        selectorColor = isLight ? 0x64000000 : 0x32ffffff;
+        selectorPaint.setColor(selectorColor);
         textPaint.setColor(0xffffffff);
 
         textPaint.setTypeface(AndroidUtilities.bold());
@@ -76,6 +78,7 @@ public class PhotoVideoSwitcherView extends View implements FlashViews.Invertabl
 
     private Utilities.Callback<Boolean> onSwitchModeListener;
     private Utilities.Callback<Float> onSwitchingModeListener;
+
     public void setOnSwitchModeListener(Utilities.Callback<Boolean> onSwitchModeListener) {
         this.onSwitchModeListener = onSwitchModeListener;
     }
@@ -105,9 +108,9 @@ public class PhotoVideoSwitcherView extends View implements FlashViews.Invertabl
 
     private float getScrollCx() {
         return getWidth() / 2f + AndroidUtilities.lerp(
-            (dp(4 + 12) + photoTextWidth / 2),
-            -(dp(4 + 12) + videoTextWidth / 2),
-            mode
+                (dp(4 + 12) + photoTextWidth / 2),
+                -(dp(4 + 12) + videoTextWidth / 2),
+                mode
         );
     }
 
@@ -251,7 +254,7 @@ public class PhotoVideoSwitcherView extends View implements FlashViews.Invertabl
     }
 
     public void setInvert(float invert) {
-        selectorPaint.setColor(ColorUtils.blendARGB(0x32ffffff, 0x20000000, invert));
+        selectorPaint.setColor(ColorUtils.blendARGB(selectorColor, 0x20000000, invert));
         textPaint.setColor(ColorUtils.blendARGB(0xffffffff, 0xff000000, invert));
     }
 }

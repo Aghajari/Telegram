@@ -96,7 +96,7 @@ import javax.microedition.khronos.egl.EGLDisplay;
 import javax.microedition.khronos.egl.EGLSurface;
 
 @SuppressLint("NewApi")
-public class CameraView extends FrameLayout implements TextureView.SurfaceTextureListener, CameraController.ICameraView, CameraController.ErrorCallback  {
+public class CameraView extends FrameLayout implements TextureView.SurfaceTextureListener, CameraController.ICameraView, CameraController.ErrorCallback {
 
     public boolean WRITE_TO_FILE_IN_BACKGROUND = false;
 
@@ -411,6 +411,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     private boolean textureInited = false;
+
     public void initTexture() {
         if (textureInited) {
             return;
@@ -437,10 +438,10 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
             int W = thumbDrawable.getIntrinsicWidth(), H = thumbDrawable.getIntrinsicHeight();
             float scale = 1f / Math.min(W / (float) Math.max(1, bounds.width()), H / (float) Math.max(1, bounds.height()));
             thumbDrawable.setBounds(
-                (int) (bounds.centerX() - W * scale / 2f),
-                (int) (bounds.centerY() - H * scale / 2f),
-                (int) (bounds.centerX() + W * scale / 2f),
-                (int) (bounds.centerY() + H * scale / 2f)
+                    (int) (bounds.centerX() - W * scale / 2f),
+                    (int) (bounds.centerY() - H * scale / 2f),
+                    (int) (bounds.centerX() + W * scale / 2f),
+                    (int) (bounds.centerY() + H * scale / 2f)
             );
             thumbDrawable.draw(canvas);
         }
@@ -468,7 +469,16 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         }
     }
 
+    public void clearThumb() {
+        if (thumbDrawable != null) {
+            thumbDrawable.setCallback(null);
+            thumbDrawable = null;
+            invalidate();
+        }
+    }
+
     private int measurementsCount = 0;
+
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
@@ -476,10 +486,11 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     private int lastWidth = -1, lastHeight = -1;
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = MeasureSpec.getSize(widthMeasureSpec),
-            height = MeasureSpec.getSize(heightMeasureSpec);
+                height = MeasureSpec.getSize(heightMeasureSpec);
         if (previewSize[0] != null && cameraSession[0] != null) {
             int frameWidth, frameHeight;
             if ((lastWidth != width || lastHeight != height) && measurementsCount > 1) {
@@ -493,7 +504,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 frameWidth = previewSize[0].getHeight();
                 frameHeight = previewSize[0].getWidth();
             }
-            float s = Math.max(MeasureSpec.getSize(widthMeasureSpec) / (float) frameWidth , MeasureSpec.getSize(heightMeasureSpec) / (float) frameHeight);
+            float s = Math.max(MeasureSpec.getSize(widthMeasureSpec) / (float) frameWidth, MeasureSpec.getSize(heightMeasureSpec) / (float) frameHeight);
             blurredStubView.getLayoutParams().width = textureView.getLayoutParams().width = (int) (s * frameWidth);
             blurredStubView.getLayoutParams().height = textureView.getLayoutParams().height = (int) (s * frameHeight);
         }
@@ -505,10 +516,24 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         pixelW = getMeasuredWidth();
         pixelH = getMeasuredHeight();
         if (pixelDualW <= 0) {
-            pixelDualW = getMeasuredWidth();
-            pixelDualH = getMeasuredHeight();
+            pixelDualW = getDualMeasuredWidth();
+            pixelDualH = getDualMeasuredHeight();
         }
     }
+
+    public void updateDualCameraSize(float width, float height) {
+        pixelDualW = width;
+        pixelDualH = height;
+    }
+
+    protected int getDualMeasuredWidth() {
+        return getMeasuredWidth();
+    }
+
+    protected int getDualMeasuredHeight() {
+        return getMeasuredHeight();
+    }
+
 
     public float getTextureHeight(float width, float height) {
         if (previewSize[0] == null || cameraSession[0] == null) {
@@ -523,7 +548,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
             frameWidth = previewSize[0].getHeight();
             frameHeight = previewSize[0].getWidth();
         }
-        float s = Math.max(width / (float) frameWidth , height / (float) frameHeight);
+        float s = Math.max(width / (float) frameWidth, height / (float) frameHeight);
         return (int) (s * frameHeight);
     }
 
@@ -560,6 +585,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     private Integer shape;
+
     public void dualToggleShape() {
         if (flipping || !dual) {
             return;
@@ -661,6 +687,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     protected CameraGLThread cameraThread;
+
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         updateCameraInfoSize(0);
@@ -671,7 +698,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         surfaceHeight = height;
         surfaceWidth = width;
 
-        if (cameraThread == null && surface != null) {
+        if (surface != null) {
             if (BuildVars.LOGS_ENABLED) {
                 FileLog.d("CameraView " + "start create thread");
             }
@@ -794,10 +821,15 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 textureView.setAlpha(0);
                 showTexture(true, true);
             }
+            onCameraInitialized();
         }
     }
 
+    protected void onCameraInitialized() {
+    }
+
     private ValueAnimator textureViewAnimator;
+
     public void showTexture(boolean show, boolean animated) {
         if (textureView == null) {
             return;
@@ -986,7 +1018,8 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                     RenderNode blurNode = (RenderNode) blurRenderNode;
                     blurNode.setPosition(0, 0, getWidth(), getHeight());
                     blurNode.beginRecording().drawRenderNode(node);
-                    blurNode.endRecording();;
+                    blurNode.endRecording();
+                    ;
                 }
             }
         }
@@ -1062,6 +1095,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     private TextureView blurTextureView;
+
     public TextureView makeBlurTextureView() {
         if (blurTextureView == null) {
             blurTextureView = new TextureView(getContext());
@@ -1113,9 +1147,11 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     private final ArrayList<Runnable> invalidateListeners = new ArrayList<>();
+
     public void listenDraw(Runnable listener) {
         invalidateListeners.add(listener);
     }
+
     public void unlistenDraw(Runnable listener) {
         invalidateListeners.remove(listener);
     }
@@ -1150,6 +1186,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     public int getVideoWidth() {
         return videoWidth;
     }
+
     public int getVideoHeight() {
         return videoHeight;
     }
@@ -1230,13 +1267,13 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         private boolean recording;
         private boolean needRecord;
 
-        private final int cameraId[] = new int[] { -1, -1 };
+        private final int cameraId[] = new int[]{-1, -1};
 
         private final float[] verticesData = {
-            -1.0f, -1.0f, 0,
-            1.0f, -1.0f, 0,
-            -1.0f, 1.0f, 0,
-            1.0f, 1.0f, 0
+                -1.0f, -1.0f, 0,
+                1.0f, -1.0f, 0,
+                -1.0f, 1.0f, 0,
+                1.0f, 1.0f, 0
         };
 
         public CameraGLThread(SurfaceTexture surface) {
@@ -1644,7 +1681,8 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                     if (currentTimeNs < nextFrameTimeNs) {
                         shouldRenderFrame = false;
                     } else {
-                        nextFrameTimeNs += (long) (TimeUnit.SECONDS.toNanos(1) / fpsLimit);;
+                        nextFrameTimeNs += (long) (TimeUnit.SECONDS.toNanos(1) / fpsLimit);
+                        ;
                         // The time for the next frame should always be in the future.
                         nextFrameTimeNs = Math.max(nextFrameTimeNs, currentTimeNs);
                         shouldRenderFrame = true;
@@ -1954,7 +1992,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                     recordFile = (File) inputMessage.obj;
                     videoEncoder = new VideoRecorder();
                     recording = true;
-                    videoEncoder.startRecording(recordFile,  EGL14.eglGetCurrentContext());
+                    videoEncoder.startRecording(recordFile, EGL14.eglGetCurrentContext());
                     break;
                 }
                 case DO_STOP_RECORDING: {
@@ -2088,6 +2126,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         }
 
         private float[] m3x3;
+
         private void getValues(Matrix matrix3x3, float[] m4x4) {
             if (m3x3 == null) {
                 m3x3 = new float[9];
@@ -2124,6 +2163,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         }
 
         private long pausedTime;
+
         public void pause(long duration) {
             pausedTime = System.currentTimeMillis() + duration;
         }
@@ -2131,6 +2171,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         private final Object updateTex1 = new Object();
         private final Object updateTex2 = new Object();
         private final Object updateTexBoth = new Object();
+
         public void requestRender(boolean updateTexImage1, boolean updateTexImage2) {
             if (pausedTime > 0 && System.currentTimeMillis() < pausedTime) {
                 return;
@@ -2225,7 +2266,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 return;
             }
             if (BuildVars.LOGS_ENABLED) {
-                FileLog.d("CameraView " + "create camera"+(useCamera2 ? "2" : "")+" session " + i);
+                FileLog.d("CameraView " + "create camera" + (useCamera2 ? "2" : "") + " session " + i);
             }
 
             if (useCamera2) {

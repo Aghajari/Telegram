@@ -290,6 +290,8 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     private PreviewView.TextureViewHolder videoTextureHolder;
     private PreviewView previewView;
 
+    private final boolean isChatAttachPicker;
+
     public void setHasAudio(boolean audio) {
         if (audio != hasAudio) {
             hasAudio = audio;
@@ -298,7 +300,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     }
 
     @SuppressLint("NotifyDataSetChanged")
-    public PaintView(Context context, boolean fileFromGallery, File file, boolean isVideo, boolean isBot, StoryRecorder.WindowView parent, Activity activity, int currentAccount, Bitmap bitmap, Bitmap blurBitmap, Bitmap originalBitmap, int originalRotation, ArrayList<VideoEditedInfo.MediaEntity> entities, StoryEntry entry, int viewWidth, int viewHeight, MediaController.CropState cropState, Runnable onInit, BlurringShader.BlurManager blurManager, Theme.ResourcesProvider resourcesProvider, PreviewView.TextureViewHolder videoTextureHolder, PreviewView previewView) {
+    public PaintView(Context context, boolean fileFromGallery, File file, boolean isVideo, boolean isBot, StoryRecorder.WindowView parent, Activity activity, int currentAccount, Bitmap bitmap, Bitmap blurBitmap, Bitmap originalBitmap, int originalRotation, ArrayList<VideoEditedInfo.MediaEntity> entities, StoryEntry entry, int viewWidth, int viewHeight, MediaController.CropState cropState, Runnable onInit, BlurringShader.BlurManager blurManager, Theme.ResourcesProvider resourcesProvider, PreviewView.TextureViewHolder videoTextureHolder, PreviewView previewView, boolean isChatAttachPicker) {
         super(context, activity, true);
         setDelegate(this);
         this.blurManager = blurManager;
@@ -311,6 +313,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         this.w = viewWidth;
         this.h = viewHeight;
         this.previewView = previewView;
+        this.isChatAttachPicker = isChatAttachPicker;
 
         this.currentAccount = currentAccount;
         this.resourcesProvider = new Theme.ResourcesProvider() {
@@ -1918,6 +1921,11 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             @Override
             public boolean canShowWidget(Integer widgetId) {
+                if (isChatAttachPicker) {
+                    return widgetId == WIDGET_PHOTO ||
+                            widgetId == WIDGET_LOCATION ||
+                            widgetId == WIDGET_AUDIO;
+                }
                 if (isBot) {
                     return widgetId == WIDGET_PHOTO;
                 }

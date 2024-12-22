@@ -19,7 +19,6 @@ import android.graphics.RectF;
 import android.graphics.RenderNode;
 import android.graphics.Shader;
 import android.net.Uri;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -27,6 +26,7 @@ import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -53,10 +53,11 @@ import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 public class CollageLayoutView2 extends FrameLayout implements ItemOptions.ScrimView {
 
-    private final FrameLayout containerView;
+    private FrameLayout containerView;
     private final Theme.ResourcesProvider resourcesProvider;
 
     public CameraView cameraView;
@@ -77,12 +78,12 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     private final LinearGradient gradient;
     private final Matrix gradientMatrix;
 
-    private final BlurringShader.BlurManager blurManager;
+    private BlurringShader.BlurManager blurManager;
+    private List<View> blurTargetViews;
+    private OnLayoutUpdateListener listener;
 
-    public CollageLayoutView2(Context context, BlurringShader.BlurManager blurManager, FrameLayout containerView, Theme.ResourcesProvider resourcesProvider) {
+    public CollageLayoutView2(Context context, Theme.ResourcesProvider resourcesProvider) {
         super(context);
-        this.blurManager = blurManager;
-        this.containerView = containerView;
         this.resourcesProvider = resourcesProvider;
 
         setBackgroundColor(0xFF1F1F1F);
@@ -101,11 +102,27 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
         highlightPaint.setStyle(Paint.Style.STROKE);
         highlightPaint.setColor(0xFFFFFFFF);
         highlightPaint.setStrokeWidth(dp(8));
-        gradient = new LinearGradient(0, 0, gradientWidth = dp(300), 0, new int[] { 0, 0xFFFFFFFF, 0xFFFFFFFF, 0 }, new float[] { 0, 0.2f, 0.8f, 1.0f }, Shader.TileMode.CLAMP);
+        gradient = new LinearGradient(0, 0, gradientWidth = dp(300), 0, new int[]{0, 0xFFFFFFFF, 0xFFFFFFFF, 0}, new float[]{0, 0.2f, 0.8f, 1.0f}, Shader.TileMode.CLAMP);
         gradientMatrix = new Matrix();
         highlightPaint.setShader(gradient);
 
         setWillNotDraw(false);
+    }
+
+    public void updateContainer(
+            BlurringShader.BlurManager blurManager,
+            FrameLayout containerView,
+            OnLayoutUpdateListener listener,
+            View blurTargetView
+    ) {
+        this.blurManager = blurManager;
+        this.containerView = containerView;
+        this.listener = listener;
+        if (blurTargetView == null) {
+            this.blurTargetViews = null;
+        } else {
+            this.blurTargetViews = List.of(this, blurTargetView);
+        }
     }
 
     @Nullable
@@ -124,6 +141,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             invalidate();
         }
     };
+
     public void setLayout(CollageLayout layout, boolean animated) {
         layout = layout == null ? new CollageLayout(".") : layout;
         this.currentLayout = layout;
@@ -171,7 +189,13 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     protected void onLayoutUpdate(CollageLayout layout) {
+        if (listener != null) {
+            listener.onLayoutUpdate(layout);
+        }
+    }
 
+    public interface OnLayoutUpdateListener {
+        void onLayoutUpdate(CollageLayout layout);
     }
 
     public void swap(int from, int to) {
@@ -189,7 +213,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             h = AndroidUtilities.displaySize.y;
         }
         layout(rect, part);
-        final boolean l = rect.left <= 0,  t = rect.top <= 0;
+        final boolean l = rect.left <= 0, t = rect.top <= 0;
         final boolean r = rect.right >= w, b = rect.bottom >= h;
         if (l && r && !t && !b) {
             rect.offset(0, h - rect.top);
@@ -219,10 +243,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             h = AndroidUtilities.displaySize.y;
         }
         rect.set(
-            ((float) w / part.layout.columns[part.y] * part.x),
-            ((float) h / part.layout.h * part.y),
-            ((float) w / part.layout.columns[part.y] * (part.x + 1)),
-            ((float) h / part.layout.h * (part.y + 1))
+                ((float) w / part.layout.columns[part.y] * part.x),
+                ((float) h / part.layout.h * part.y),
+                ((float) w / part.layout.columns[part.y] * (part.x + 1)),
+                ((float) h / part.layout.h * (part.y + 1))
         );
     }
 
@@ -279,12 +303,12 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private final AnimatedFloat animatedRows = new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
-    private final AnimatedFloat[] animatedColumns = new AnimatedFloat[] {
-        new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
-        new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
-        new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
-        new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
-        new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT)
+    private final AnimatedFloat[] animatedColumns = new AnimatedFloat[]{
+            new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
+            new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
+            new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
+            new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT),
+            new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT)
     };
     private final AnimatedFloat animatedReordering = new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
     private final float[] lefts = new float[5];
@@ -297,10 +321,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             final float H = p.layout.h;
             final float cols = animatedColumns[p.y].set(p.layout.columns[p.y]);
             rect.set(
-                ((float) getMeasuredWidth() / cols * p.x),
-                ((float) getMeasuredHeight() / H * p.y),
-                ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                ((float) getMeasuredHeight() / H * (p.y + 1))
+                    ((float) getMeasuredWidth() / cols * p.x),
+                    ((float) getMeasuredHeight() / H * p.y),
+                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                    ((float) getMeasuredHeight() / H * (p.y + 1))
             );
             drawPart(canvas, rect, longPressedPart);
         }
@@ -313,10 +337,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             final float H = p.layout.h;
             final float cols = animatedColumns[p.y].set(p.layout.columns[p.y]);
             bounds.set(
-                ((float) getMeasuredWidth() / cols * p.x),
-                ((float) getMeasuredHeight() / H * p.y),
-                ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                ((float) getMeasuredHeight() / H * (p.y + 1))
+                    ((float) getMeasuredWidth() / cols * p.x),
+                    ((float) getMeasuredHeight() / H * p.y),
+                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                    ((float) getMeasuredHeight() / H * (p.y + 1))
             );
         } else {
             bounds.set(0, 0, getWidth(), getHeight());
@@ -324,6 +348,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private final RectF rect = new RectF();
+
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
         super.dispatchDraw(canvas);
@@ -353,10 +378,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
                 AndroidUtilities.lerp(part.fromBounds, part.bounds, part.boundsTransition, rect);
             } else {
                 rect.set(
-                    ((float) getMeasuredWidth() / cols * p.x),
-                    ((float) getMeasuredHeight() / H * p.y),
-                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                    ((float) getMeasuredHeight() / H * (p.y + 1))
+                        ((float) getMeasuredWidth() / cols * p.x),
+                        ((float) getMeasuredHeight() / H * p.y),
+                        ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                        ((float) getMeasuredHeight() / H * (p.y + 1))
                 );
             }
             lefts[p.y] = Math.min(lefts[p.y], rect.left);
@@ -373,10 +398,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             final CollageLayout.Part p = part.part;
             final float cols = animatedColumns[p.y].set(p.y >= currentLayout.columns.length ? 1 : currentLayout.columns[p.y]);
             rect.set(
-                ((float) getMeasuredWidth() / cols * p.x),
-                ((float) getMeasuredHeight() / H * p.y),
-                ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                ((float) getMeasuredHeight() / H * (p.y + 1))
+                    ((float) getMeasuredWidth() / cols * p.x),
+                    ((float) getMeasuredHeight() / H * p.y),
+                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                    ((float) getMeasuredHeight() / H * (p.y + 1))
             );
             lefts[p.y] = Math.min(lefts[p.y], rect.left);
             rights[p.y] = Math.max(rights[p.y], rect.right);
@@ -390,19 +415,19 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             for (int y = 0; y < Math.ceil(H); ++y) {
                 if (lefts[y] >= 0) {
                     rect.set(
-                        0,
-                        ((float) getMeasuredHeight() / H * y),
-                        lefts[y],
-                        ((float) getMeasuredHeight() / H * (y + 1))
+                            0,
+                            ((float) getMeasuredHeight() / H * y),
+                            lefts[y],
+                            ((float) getMeasuredHeight() / H * (y + 1))
                     );
                     drawPart(canvas, rect, null);
                 }
                 if (rights[y] < getMeasuredWidth()) {
                     rect.set(
-                        rights[y],
-                        ((float) getMeasuredHeight() / H * y),
-                        (float) getMeasuredWidth(),
-                        ((float) getMeasuredHeight() / H * (y + 1))
+                            rights[y],
+                            ((float) getMeasuredHeight() / H * y),
+                            (float) getMeasuredWidth(),
+                            ((float) getMeasuredHeight() / H * (y + 1))
                     );
                     drawPart(canvas, rect, null);
                 }
@@ -441,16 +466,16 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
                 AndroidUtilities.lerp(part.fromBounds, part.bounds, part.boundsTransition, rect);
             } else {
                 rect.set(
-                    ((float) getMeasuredWidth() / cols * p.x),
-                    ((float) getMeasuredHeight() / H * p.y),
-                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                    ((float) getMeasuredHeight() / H * (p.y + 1))
+                        ((float) getMeasuredWidth() / cols * p.x),
+                        ((float) getMeasuredHeight() / H * p.y),
+                        ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                        ((float) getMeasuredHeight() / H * (p.y + 1))
                 );
             }
             AndroidUtilities.rectTmp.set(rect);
             AndroidUtilities.rectTmp.inset(dp(4), dp(4));
             gradientMatrix.reset();
-            gradientMatrix.postTranslate(rect.left + lerp(-1.4f*(float)Math.sqrt(gradientWidth*gradientWidth+gradientWidth*gradientWidth), (float)Math.sqrt(rect.width()*rect.width()+rect.height()*rect.height()), 1.0f - highlight), 0);
+            gradientMatrix.postTranslate(rect.left + lerp(-1.4f * (float) Math.sqrt(gradientWidth * gradientWidth + gradientWidth * gradientWidth), (float) Math.sqrt(rect.width() * rect.width() + rect.height() * rect.height()), 1.0f - highlight), 0);
             gradientMatrix.postRotate(-25);
             gradient.setLocalMatrix(gradientMatrix);
             final float alpha = 1.0f; // (float) Math.pow(4 * highlight * (1 - highlight), 0.05f);
@@ -479,6 +504,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private final Path clipPath = new Path();
+
     private void drawPart(Canvas canvas, RectF rect, Part part) {
         if (AndroidUtilities.makingGlobalBlurBitmap && part == longPressedPart) {
             return;
@@ -671,11 +697,13 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private boolean needsBlur;
+
     public void setCameraNeedsBlur(boolean needsBlur) {
         if (this.needsBlur == needsBlur) return;
         this.needsBlur = needsBlur;
         updateCameraNeedsBlur();
     }
+
     public void updateCameraNeedsBlur() {
         final boolean canDoBlur = cameraView != null && needsBlur;
         final boolean hasBlur = cameraViewBlurRenderNode != null;
@@ -694,10 +722,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             final CollageLayout.Part p = part.part;
             final float cols = animatedColumns[p.y].get();
             rect.set(
-                ((float) getMeasuredWidth() / cols * p.x),
-                ((float) getMeasuredHeight() / H * p.y),
-                ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                ((float) getMeasuredHeight() / H * (p.y + 1))
+                    ((float) getMeasuredWidth() / cols * p.x),
+                    ((float) getMeasuredHeight() / H * p.y),
+                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                    ((float) getMeasuredHeight() / H * (p.y + 1))
             );
             if (rect.contains(x, y)) return part;
         }
@@ -711,10 +739,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             final CollageLayout.Part p = part.part;
             final float cols = animatedColumns[p.y].get();
             rect.set(
-                ((float) getMeasuredWidth() / cols * p.x),
-                ((float) getMeasuredHeight() / H * p.y),
-                ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                ((float) getMeasuredHeight() / H * (p.y + 1))
+                    ((float) getMeasuredWidth() / cols * p.x),
+                    ((float) getMeasuredHeight() / H * p.y),
+                    ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                    ((float) getMeasuredHeight() / H * (p.y + 1))
             );
             if (rect.contains(x, y)) return i;
         }
@@ -722,7 +750,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private void onLongPress() {
-        if (reorderingTouch || preview) return;
+        if (reorderingTouch || preview || blurManager == null || containerView == null) return;
         if (longPressedPart != null && longPressedPart.videoPlayer != null) {
             longPressedPart.videoPlayer.setVolume(0.0f);
         }
@@ -752,42 +780,42 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
         ItemOptions i = ItemOptions.makeOptions(containerView, resourcesProvider, this);
         if (longPressedPart.content.isVideo) {
             final SliderView volumeSlider =
-                new SliderView(getContext(), SliderView.TYPE_VOLUME)
-                    .setMinMax(0, 1.5f)
-                    .setValue(longPressedPart.content.videoVolume)
-                    .setOnValueChange(volume -> {
-                        longPressedPart.content.videoVolume = volume;
-                        if (longPressedPart.videoPlayer != null) {
-                            longPressedPart.videoPlayer.setVolume(longPressedPart.content.videoVolume);
-                        }
-                    });
+                    new SliderView(getContext(), SliderView.TYPE_VOLUME)
+                            .setMinMax(0, 1.5f)
+                            .setValue(longPressedPart.content.videoVolume)
+                            .setOnValueChange(volume -> {
+                                longPressedPart.content.videoVolume = volume;
+                                if (longPressedPart.videoPlayer != null) {
+                                    longPressedPart.videoPlayer.setVolume(longPressedPart.content.videoVolume);
+                                }
+                            });
             volumeSlider.fixWidth = dp(220);
             i.addView(volumeSlider).addSpaceGap();
         }
 
         i
-            .setFixedWidth(220)
-            .add(R.drawable.menu_camera_retake, LocaleController.getString(R.string.StoreCollageRetake), () -> {
-                retake(longPressedPart);
-            })
-            .add(R.drawable.msg_delete, LocaleController.getString(R.string.Delete), true, () -> {
-                delete(longPressedPart);
-            })
-            .addSpaceGap()
-            .addView(hintLayout, LayoutHelper.createLinear(220, LayoutHelper.WRAP_CONTENT))
-            .setOnDismiss(() -> {
+                .setFixedWidth(220)
+                .add(R.drawable.menu_camera_retake, LocaleController.getString(R.string.StoreCollageRetake), () -> {
+                    retake(longPressedPart);
+                })
+                .add(R.drawable.msg_delete, LocaleController.getString(R.string.Delete), true, () -> {
+                    delete(longPressedPart);
+                })
+                .addSpaceGap()
+                .addView(hintLayout, LayoutHelper.createLinear(220, LayoutHelper.WRAP_CONTENT))
+                .setOnDismiss(() -> {
 
-            })
-            .setGravity(Gravity.CENTER_HORIZONTAL)
-            .allowCenter(true)
-            .setBlur(true)
-            .setRoundRadius(dp(12), dp(10))
-            .setOnDismiss(() -> {
-                if (longPressedPart != null && longPressedPart.videoPlayer != null) {
-                    longPressedPart.videoPlayer.setVolume(0.0f);
-                }
-            })
-            .show();
+                })
+                .setGravity(Gravity.CENTER_HORIZONTAL)
+                .allowCenter(true)
+                .setBlur(true, blurTargetViews)
+                .setRoundRadius(dp(12), dp(10))
+                .setOnDismiss(() -> {
+                    if (longPressedPart != null && longPressedPart.videoPlayer != null) {
+                        longPressedPart.videoPlayer.setVolume(0.0f);
+                    }
+                })
+                .show();
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
     }
 
@@ -872,10 +900,10 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
                     final CollageLayout.Part p = reorderingPart.part;
                     final float cols = animatedColumns[p.y].get();
                     rect.set(
-                        ((float) getMeasuredWidth() / cols * p.x),
-                        ((float) getMeasuredHeight() / H * p.y),
-                        ((float) getMeasuredWidth() / cols * (p.x + 1)),
-                        ((float) getMeasuredHeight() / H * (p.y + 1))
+                            ((float) getMeasuredWidth() / cols * p.x),
+                            ((float) getMeasuredHeight() / H * p.y),
+                            ((float) getMeasuredWidth() / cols * (p.x + 1)),
+                            ((float) getMeasuredHeight() / H * (p.y + 1))
                     );
                     ldx = dx;
                     ldy = dy;
@@ -948,9 +976,11 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
         private boolean current;
         private StoryEntry content;
 
-        public Part() {}
+        public Part() {
+        }
 
         private ValueAnimator animator;
+
         public void setPart(CollageLayout.Part part, boolean animated) {
             final CollageLayout.Part oldPart = this.part;
             if (part != null) this.part = part;
@@ -1095,6 +1125,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private boolean attached;
+
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
@@ -1115,11 +1146,13 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private Runnable cancelGestures;
+
     public void setCancelGestures(Runnable cancelGestures) {
         this.cancelGestures = cancelGestures;
     }
 
     private Runnable onResetState;
+
     public void setResetState(Runnable onResetState) {
         this.onResetState = onResetState;
     }
@@ -1182,11 +1215,13 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private TimelineView timelineView;
+
     public void setTimelineView(TimelineView timelineView) {
         this.timelineView = timelineView;
     }
 
     private PreviewView previewView;
+
     public void setPreviewView(PreviewView previewView) {
         this.previewView = previewView;
     }
@@ -1211,11 +1246,13 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     private boolean restorePositionOnPlaying = true;
+
     public void forceNotRestorePosition() {
 //        restorePositionOnPlaying = false;
     }
 
     private long lastPausedPosition;
+
     public void setPlaying(boolean playing) {
         final boolean restore = restorePositionOnPlaying;
         restorePositionOnPlaying = true;
@@ -1237,6 +1274,7 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
     }
 
     public boolean isMuted;
+
     public void setMuted(boolean muted) {
         if (isMuted == muted) return;
         isMuted = muted;
@@ -1313,5 +1351,4 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             AndroidUtilities.runOnUIThread(this.syncRunnable, (long) (1000L / AndroidUtilities.screenRefreshRate));
         }
     };
-
 }
